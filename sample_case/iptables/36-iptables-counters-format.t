@@ -1,10 +1,15 @@
-# Test: Read iptables counters for INPUT chain deterministically (format only)
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Read iptables counters for INPUT chain deterministically (format only)
+# Notes:
+#  - Output normalized; does not mutate system state.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Show header and one rule line with normalized spaces
-$ iptables -L INPUT -n -v | sed 's/[[:space:]]\\+/ /g' | head -n 3
-Chain INPUT (policy *) (glob)
-*
-*
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
+
+Show header and two lines (normalized):
+
+  $ R "iptables -L INPUT -n -v 2>/dev/null | sed 's/[[:space:]]\\+/ /g' | head -n 3 || echo missing"
+  Chain INPUT (policy * (glob)
+  *
+  *

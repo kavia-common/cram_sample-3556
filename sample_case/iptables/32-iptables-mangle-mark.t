@@ -1,18 +1,23 @@
-# Test: Insert and verify a MARK rule in mangle table PREROUTING
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Insert and verify a MARK rule in mangle PREROUTING (temporary)
+# Notes:
+#  - Non-destructive; rule removed in cleanup. Deterministic verification.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Insert MARK rule with unique fwmark value
-$ FW_MARK="0x1a2b"
-$ iptables -t mangle -I PREROUTING 1 -p tcp --dport 65520 -j MARK --set-mark ${FW_MARK}
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Verify rule presence (normalize whitespace)
-$ iptables -t mangle -S PREROUTING | grep -E -- "-p tcp .* --dport 65520 .* -j MARK .* --set-xmark ${FW_MARK}/0xffffffff|--set-mark ${FW_MARK}" | sed 's/[[:space:]]\\+/ /g' | sort | uniq
--A PREROUTING * -p tcp * --dport 65520 * -j MARK * (glob)
+Insert MARK rule with unique fwmark value:
 
-# Cleanup: delete the rule
-$ iptables -t mangle -D PREROUTING -p tcp --dport 65520 -j MARK --set-mark ${FW_MARK} 2>/dev/null || true
-$ iptables -t mangle -D PREROUTING -p tcp --dport 65520 -j MARK --set-xmark ${FW_MARK}/0xffffffff 2>/dev/null || true
-$ echo "Cleaned mangle mark rule"
-Cleaned mangle mark rule
+  $ R 'FW_MARK="0x1a2b"; iptables -t mangle -I PREROUTING 1 -p tcp --dport 65520 -j MARK --set-mark ${FW_MARK} 2>/dev/null || true; echo added'
+  added
+
+Verify rule presence (normalized):
+
+  $ R 'FW_MARK="${FW_MARK:-0x1a2b}"; iptables -t mangle -S PREROUTING 2>/dev/null | grep -E -- "-p tcp .* --dport 65520 .* -j MARK .* (--set-xmark ${FW_MARK}/0xffffffff|--set-mark ${FW_MARK})" | sed "s/[[:space:]]\\+/ /g" | sort | uniq'
+  -A PREROUTING * -p tcp * --dport 65520 * -j MARK * (glob)
+
+Cleanup:
+
+  $ R 'FW_MARK="${FW_MARK:-0x1a2b}"; iptables -t mangle -D PREROUTING -p tcp --dport 65520 -j MARK --set-mark ${FW_MARK} 2>/dev/null || true; iptables -t mangle -D PREROUTING -p tcp --dport 65520 -j MARK --set-xmark ${FW_MARK}/0xffffffff 2>/dev/null || true; echo cleaned'
+  cleaned

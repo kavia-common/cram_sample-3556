@@ -1,24 +1,28 @@
-# Test: Stateful firewall rules presence - ESTABLISHED,RELATED accept and INVALID drop
-#
-# - Inserts temporary INVALID drop at head; verifies presence.
-# - Checks for ACCEPT state ESTABLISHED,RELATED via existing rules (skip-safe if absent).
-# - Cleans up temporary INVALID rule.
-#
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Verify stateful rules presence (temporary INVALID DROP insertion)
+# Notes:
+#  - Non-destructive; deterministic checks; cleanup included.
 
-# Insert an INVALID drop rule to INPUT for demonstration
-$ iptables -I INPUT 1 -m conntrack --ctstate INVALID -j DROP 2>/dev/null || true
+Create R alias:
 
-# Verify INVALID drop
-$ iptables-save | grep -E "^-A INPUT .* -m conntrack --ctstate INVALID .* -j DROP" | sed 's/[[:space:]]\\+/ /g' | head -n 1
--A INPUT * -m conntrack --ctstate INVALID * -j DROP
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Check for ESTABLISHED,RELATED accept in INPUT or FORWARD (skip-safe)
-$ iptables-save | grep -E "^-A (INPUT|FORWARD) .* -m conntrack --ctstate ESTABLISHED,RELATED .* -j ACCEPT" | sed 's/[[:space:]]\\+/ /g' | head -n 1 || echo "no-est-rel-accept"
-* (glob)
+Insert INVALID drop rule:
 
-# Cleanup
-$ iptables -D INPUT -m conntrack --ctstate INVALID -j DROP 2>/dev/null || true
-$ echo "Cleaned INVALID drop rule"
-Cleaned INVALID drop rule
+  $ R 'iptables -I INPUT 1 -m conntrack --ctstate INVALID -j DROP 2>/dev/null || true; echo added'
+  added
+
+Verify INVALID drop presence:
+
+  $ R 'iptables-save | grep -E "^-A INPUT .* -m conntrack --ctstate INVALID .* -j DROP" | sed "s/[[:space:]]\\+/ /g" | head -n 1'
+  -A INPUT * -m conntrack --ctstate INVALID * -j DROP
+
+Check for ESTABLISHED,RELATED accepts (skip-safe):
+
+  $ R 'iptables-save | grep -E "^-A (INPUT|FORWARD) .* -m conntrack --ctstate ESTABLISHED,RELATED .* -j ACCEPT" | sed "s/[[:space:]]\\+/ /g" | head -n 1 || echo no-est-rel-accept'
+  * (glob)
+
+Cleanup:
+
+  $ R 'iptables -D INPUT -m conntrack --ctstate INVALID -j DROP 2>/dev/null || true; echo cleaned'
+  cleaned

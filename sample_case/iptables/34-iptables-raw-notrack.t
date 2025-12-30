@@ -1,16 +1,23 @@
-# Test: Add a NOTRACK rule in raw table and verify
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Add a NOTRACK rule in raw table and verify (temporary)
+# Notes:
+#  - Non-destructive; rule removed in cleanup.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Insert NOTRACK rule for local UDP dport 65532
-$ iptables -t raw -I PREROUTING 1 -p udp --dport 65532 -j NOTRACK 2>/dev/null || true
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Verify rule presence
-$ iptables -t raw -S PREROUTING | grep -E -- "-p udp .* --dport 65532 .* -j NOTRACK" | sed 's/[[:space:]]\\+/ /g' | sort | uniq
--A PREROUTING * -p udp * --dport 65532 * -j NOTRACK
+Insert NOTRACK rule for UDP dport 65532:
 
-# Cleanup
-$ iptables -t raw -D PREROUTING -p udp --dport 65532 -j NOTRACK 2>/dev/null || true
-$ echo "Cleaned NOTRACK rule"
-Cleaned NOTRACK rule
+  $ R 'iptables -t raw -I PREROUTING 1 -p udp --dport 65532 -j NOTRACK 2>/dev/null || true; echo added'
+  added
+
+Verify rule presence:
+
+  $ R 'iptables -t raw -S PREROUTING 2>/dev/null | grep -E -- "-p udp .* --dport 65532 .* -j NOTRACK" | sed "s/[[:space:]]\\+/ /g" | sort | uniq'
+  -A PREROUTING * -p udp * --dport 65532 * -j NOTRACK
+
+Cleanup:
+
+  $ R 'iptables -t raw -D PREROUTING -p udp --dport 65532 -j NOTRACK 2>/dev/null || true; echo cleaned'
+  cleaned

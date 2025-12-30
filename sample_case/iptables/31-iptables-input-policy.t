@@ -1,13 +1,18 @@
-# Test: Verify INPUT chain default policy is readable and in expected set
-# Note: We do not modify policy here; we only parse and assert format deterministically.
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Verify INPUT chain default policy formatting deterministically (read-only)
+# Notes:
+#  - Does not modify policy; uses normalized expectations.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Show INPUT policy line from `iptables -L` and normalize whitespace
-$ iptables -L INPUT -n | sed -n '1p' | sed 's/[[:space:]]\\+/ /g'
-Chain INPUT (policy * ) (glob)
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Show any terminal REJECT/DROP rule lines (if present), normalize output
-$ iptables -S INPUT | grep -E -- '-j (REJECT|DROP)$' | sed 's/[[:space:]]\\+/ /g' | sort | uniq || true
-* (glob)
+Show INPUT policy line from iptables -L (normalized):
+
+  $ R "iptables -L INPUT -n 2>/dev/null | sed -n '1p' | sed 's/[[:space:]]\\+/ /g' || echo missing"
+  Chain INPUT (policy * (glob)
+
+Show any terminal REJECT/DROP rules (if present), normalized:
+
+  $ R "iptables -S INPUT 2>/dev/null | grep -E -- '-j (REJECT|DROP)$' | sed 's/[[:space:]]\\+/ /g' | sort | uniq || true"
+  * (glob)
