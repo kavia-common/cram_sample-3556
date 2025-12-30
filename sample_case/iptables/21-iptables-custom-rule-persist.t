@@ -1,37 +1,28 @@
-# Test: Add custom iptables rule via /etc/firewall.user and verify it persists after reload
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Add custom iptables rule via /etc/firewall.user and verify persistence after reload
+# Notes:
+#  - Uses R alias; deterministic normalized checks; full cleanup.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Backup firewall.user
-$ USER_FILE="/etc/firewall.user"
-$ BAK_FILE="/tmp/firewall.user.cram.bak"
-$ [ -f "${USER_FILE}" ] && cp "${USER_FILE}" "${BAK_FILE}" || touch "${BAK_FILE}"
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Append a tagged custom rule to INPUT chain that should persist after reload
-$ TAG="CRAM_CUSTOM_RULE_$$"
-$ echo "# ${TAG}" >> "${USER_FILE}"
-$ echo "iptables -I INPUT -p tcp --dport 65530 -j ACCEPT" >> "${USER_FILE}"
+Backup firewall.user and append tagged rule:
 
-# Reload firewall to execute firewall.user
-$ /etc/init.d/firewall reload >/dev/null 2>&1 || true
-$ sleep 2
+  $ R 'USER_FILE="/etc/firewall.user"; BAK_FILE="/tmp/firewall.user.cram.bak"; [ -f "$USER_FILE" ] && cp "$USER_FILE" "$BAK_FILE" || touch "$BAK_FILE"; TAG="CRAM_CUSTOM_RULE_$$"; echo "# ${TAG}" >> "$USER_FILE"; echo "iptables -I INPUT -p tcp --dport 65530 -j ACCEPT" >> "$USER_FILE"; /etc/init.d/firewall reload >/dev/null 2>&1 || true; sleep 2; echo ok'
+  ok
 
-# Verify rule presence (grep for dport 65530 and ACCEPT)
-$ iptables -S INPUT | grep -E -- '-p tcp .* --dport 65530 .* -j ACCEPT' | sed 's/[[:space:]]\+/ /g' | sort | uniq
--A INPUT * -p tcp * --dport 65530 * -j ACCEPT
+Verify presence (normalized):
 
-# Reload again to test persistence
-$ /etc/init.d/firewall reload >/dev/null 2>&1 || true
-$ sleep 2
-$ iptables -S INPUT | grep -E -- '-p tcp .* --dport 65530 .* -j ACCEPT' | sed 's/[[:space:]]\+/ /g' | sort | uniq
--A INPUT * -p tcp * --dport 65530 * -j ACCEPT
+  $ R 'iptables -S INPUT 2>/dev/null | grep -E -- "-p tcp .* --dport 65530 .* -j ACCEPT" | sed "s/[[:space:]]\\+/ /g" | sort | uniq'
+  -A INPUT * -p tcp * --dport 65530 * -j ACCEPT
 
-# Cleanup: restore firewall.user and reload, also remove rule if still present
-$ mv "${BAK_FILE}" "${USER_FILE}" 2>/dev/null || true
-$ /etc/init.d/firewall reload >/dev/null 2>&1 || true
-$ sleep 2
-$ # Ensure rule absent (best-effort delete)
-$ iptables -D INPUT -p tcp --dport 65530 -j ACCEPT 2>/dev/null || true
-$ echo "Restored firewall.user and cleaned custom rule"
-Restored firewall.user and cleaned custom rule
+Reload to confirm persistence:
+
+  $ R '/etc/init.d/firewall reload >/dev/null 2>&1 || true; sleep 2; iptables -S INPUT 2>/dev/null | grep -E -- "-p tcp .* --dport 65530 .* -j ACCEPT" | sed "s/[[:space:]]\\+/ /g" | sort | uniq'
+  -A INPUT * -p tcp * --dport 65530 * -j ACCEPT
+
+Cleanup and restore:
+
+  $ R 'mv "$BAK_FILE" "$USER_FILE" 2>/dev/null || true; /etc/init.d/firewall reload >/dev/null 2>&1 || true; sleep 2; iptables -D INPUT -p tcp --dport 65530 -j ACCEPT 2>/dev/null || true; echo "Restored firewall.user and cleaned custom rule"'
+  Restored firewall.user and cleaned custom rule

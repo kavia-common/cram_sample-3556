@@ -1,21 +1,28 @@
-# Test: Add limit module rule with counters and verify presence
-# Note: On quiet systems counters may remain 0; we validate rule presence deterministically.
+# Reference: sample_case/02-sample2.t for format and conventions
+# Purpose: Add limit module rule with counters and verify presence (temporary)
+# Notes:
+#  - Uses R alias; normalized outputs; full cleanup.
 
-$ set -e
-$ export PATH=/sbin:/usr/sbin:/bin:/usr/bin:$PATH
+Create R alias:
 
-# Insert a rate limit rule into INPUT for ICMP echo-request
-$ iptables -I INPUT 1 -p icmp --icmp-type echo-request -m limit --limit 1/second --limit-burst 3 -j ACCEPT
+  $ alias R="${CRAM_REMOTE_COMMAND:-}"
 
-# Normalize and verify rule presence
-$ iptables -S INPUT | grep -E -- '-p icmp .*--icmp-type echo-request .* -m limit .* --limit .* --limit-burst .* -j ACCEPT' | sed 's/[[:space:]]\+/ /g' | sort | uniq
--A INPUT * -p icmp * --icmp-type echo-request * -m limit * --limit * --limit-burst * -j ACCEPT
+Insert rate-limit rule (ICMP echo-request):
 
-# Show counters deterministically via iptables -L with numeric, but only verify the header line containing ACCEPT
-$ iptables -L INPUT -n -v | awk 'NR==1 || /ACCEPT/ {print}' | sed 's/[[:space:]]\+/ /g' | head -n 3
-Chain INPUT (policy *)
+  $ R 'iptables -I INPUT 1 -p icmp --icmp-type echo-request -m limit --limit 1/second --limit-burst 3 -j ACCEPT 2>/dev/null || true; echo added'
+  added
 
-# Cleanup: remove the inserted rule
-$ iptables -D INPUT -p icmp --icmp-type echo-request -m limit --limit 1/second --limit-burst 3 -j ACCEPT 2>/dev/null || true
-$ echo "Cleaned rate-limit rule"
-Cleaned rate-limit rule
+Verify rule presence (normalized):
+
+  $ R 'iptables -S INPUT 2>/dev/null | grep -E -- "-p icmp .*--icmp-type echo-request .* -m limit .* --limit .* --limit-burst .* -j ACCEPT" | sed "s/[[:space:]]\\+/ /g" | sort | uniq'
+  -A INPUT * -p icmp * --icmp-type echo-request * -m limit * --limit * --limit-burst * -j ACCEPT
+
+Show header line deterministically:
+
+  $ R 'iptables -L INPUT -n -v 2>/dev/null | sed "s/[[:space:]]\\+/ /g" | sed -n "1p" || echo missing'
+  Chain INPUT (policy * (glob)
+
+Cleanup:
+
+  $ R 'iptables -D INPUT -p icmp --icmp-type echo-request -m limit --limit 1/second --limit-burst 3 -j ACCEPT 2>/dev/null || true; echo "Cleaned rate-limit rule"'
+  Cleaned rate-limit rule
